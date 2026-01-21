@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Container, Typography, Box, Card, CardContent, Avatar, Chip, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper } from '@mui/material'
 import { EmojiEvents, TrendingUp } from '@mui/icons-material'
 import { useTheme } from '../lib/ThemeContext'
-import axios from 'axios'
+import api from '../lib/api'
 
 const Leaderboard: React.FC = () => {
   const { isDark } = useTheme()
@@ -18,10 +18,11 @@ const Leaderboard: React.FC = () => {
 
   const fetchLeaderboard = async () => {
     try {
-      const response = await axios.get('/user/leaderboard', { headers })
-      setUsers(response.data)
+      const response = await api.get('/user/leaderboard', { headers })
+      setUsers(Array.isArray(response.data) ? response.data : [])
     } catch (error) {
       console.error('Error fetching leaderboard:', error)
+      setUsers([])
     } finally {
       setLoading(false)
     }

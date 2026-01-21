@@ -3,13 +3,7 @@ import { Container, Box, Typography, Card, CardContent, Button, IconButton, Chip
 import { Add, ArrowUpward, ArrowDownward, Topic, Quiz, Settings, Dashboard, Edit } from '@mui/icons-material'
 import { useTheme } from '../lib/ThemeContext'
 import { useNavigate } from '../lib/router'
-import axios from 'axios'
-
-// Configure axios base URL
-const apiBaseUrl = import.meta.env.MODE === 'production' 
-  ? import.meta.env.VITE_API_BASE_URL_PROD 
-  : import.meta.env.VITE_API_BASE_URL
-axios.defaults.baseURL = apiBaseUrl
+import api from '../lib/api'
 
 const ModeratorPractice: React.FC = () => {
   const { isDark } = useTheme()
@@ -24,8 +18,12 @@ const ModeratorPractice: React.FC = () => {
   const [activities, setActivities] = useState<any[]>([])
 
   const token = localStorage.getItem('token')
-  const headers = { Authorization: `Bearer ${token}` }
+  const headers = token ? { Authorization: `Bearer ${token}` } : {}
   const user = JSON.parse(localStorage.getItem('user') || '{}')
+
+  // Debug logging
+  console.log('Token:', token ? 'Present' : 'Missing')
+  console.log('User role:', user.role)
 
   useEffect(() => {
     fetchTopics()
@@ -34,15 +32,20 @@ const ModeratorPractice: React.FC = () => {
   }, [])
 
   const fetchStats = async () => {
+    if (!token) {
+      console.error('No token available')
+      return
+    }
     try {
-      const topicsResponse = await axios.get('/moderator/topics', { headers })
+      const topicsResponse = await api.get('/moderator/topics', { headers })
+      const topicsData = Array.isArray(topicsResponse.data) ? topicsResponse.data : []
       let totalQuestions = 0
-      for (const topic of topicsResponse.data) {
-        const questionsResponse = await axios.get(`/moderator/topics/${topic._id}/questions`, { headers })
+      for (const topic of topicsData) {
+        const questionsResponse = await api.get(`/moderator/topics/${topic._id}/questions`, { headers })
         totalQuestions += questionsResponse.data.length
       }
       setStats({
-        totalTopics: topicsResponse.data.length,
+        totalTopics: topicsData.length,
         totalQuestions,
         totalStudents: 0 // This would need a separate API endpoint
       })
@@ -52,8 +55,12 @@ const ModeratorPractice: React.FC = () => {
   }
 
   const fetchActivities = async () => {
+    if (!token) {
+      console.error('No token available')
+      return
+    }
     try {
-      const response = await axios.get('/user/activities', { headers })
+      const response = await api.get('/moderator/activities', { headers })
       setActivities(response.data)
     } catch (error) {
       console.error('Error fetching activities:', error)
@@ -74,17 +81,22 @@ const ModeratorPractice: React.FC = () => {
   }
 
   const fetchTopics = async () => {
+    if (!token) {
+      console.error('No token available')
+      return
+    }
     try {
-      const response = await axios.get('/moderator/topics', { headers })
-      setTopics(response.data)
+      const response = await api.get('/moderator/topics', { headers })
+      setTopics(Array.isArray(response.data) ? response.data : [])
     } catch (error) {
       console.error('Error fetching topics:', error)
+      setTopics([])
     }
   }
 
   const fetchQuestions = async (topicId: string) => {
     try {
-      const response = await axios.get(`/moderator/topics/${topicId}/questions`, { headers })
+      const response = await api.get(`/moderator/topics/${topicId}/questions`, { headers })
       setQuestions(response.data)
     } catch (error) {
       console.error('Error fetching questions:', error)
@@ -100,11 +112,11 @@ const ModeratorPractice: React.FC = () => {
     try {
       if (editingTopic) {
         // Update existing topic
-        await axios.put(`/moderator/topics/${editingTopic._id}`, topicForm, { headers })
+        await api.put(`/moderator/topics/${editingTopic._id}`, topicForm, { headers })
       } else {
         // Create new topic
         const order = topics.length + 1
-        await axios.post('/moderator/topics', { ...topicForm, order }, { headers })
+        await api.post('/moderator/topics', { ...topicForm, order }, { headers })
       }
       setOpenTopicDialog(false)
       setTopicForm({ title: '', description: '', difficulty: 'Easy' })
@@ -145,14 +157,14 @@ const ModeratorPractice: React.FC = () => {
     try {
       if (type === 'topic') {
         await Promise.all([
-          axios.put(`/moderator/topics/${newItems[index]._id}`, { order: newItems[index].order }, { headers }),
-          axios.put(`/moderator/topics/${newItems[newIndex]._id}`, { order: newItems[newIndex].order }, { headers })
+          api.put(`/moderator/topics/${newItems[index]._id}`, { order: newItems[index].order }, { headers }),
+          api.put(`/moderator/topics/${newItems[newIndex]._id}`, { order: newItems[newIndex].order }, { headers })
         ])
         fetchTopics()
       } else {
         await Promise.all([
-          axios.put(`/moderator/questions/${newItems[index]._id}`, { order: newItems[index].order }, { headers }),
-          axios.put(`/moderator/questions/${newItems[newIndex]._id}`, { order: newItems[newIndex].order }, { headers })
+          api.put(`/moderator/questions/${newItems[index]._id}`, { order: newItems[index].order }, { headers }),
+          api.put(`/moderator/questions/${newItems[newIndex]._id}`, { order: newItems[newIndex].order }, { headers })
         ])
         fetchQuestions(selectedTopic._id)
       }

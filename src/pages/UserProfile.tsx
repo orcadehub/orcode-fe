@@ -1,13 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Container, Typography, Box, Card, CardContent, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Chip, LinearProgress } from '@mui/material'
 import { TrendingUp, CheckCircle, Code, Timer, Memory, EmojiEvents } from '@mui/icons-material'
-import axios from 'axios'
-
-// Configure axios base URL
-const apiBaseUrl = import.meta.env.MODE === 'production' 
-  ? import.meta.env.VITE_API_BASE_URL_PROD 
-  : import.meta.env.VITE_API_BASE_URL
-axios.defaults.baseURL = apiBaseUrl
+import api from '../lib/api'
 
 interface UserProgress {
   totalCoins: number
@@ -52,7 +46,7 @@ const UserProfile: React.FC = () => {
   
   const fetchUserProgress = async () => {
     try {
-      const response = await axios.get('/user/progress', { headers })
+      const response = await api.get('/user/progress', { headers })
       setProgress(response.data)
     } catch (error) {
       console.error('Error fetching user progress:', error)

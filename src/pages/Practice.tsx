@@ -3,13 +3,7 @@ import { Container, Typography, Box, Card, CardContent, Button, Chip, LinearProg
 import { Lock, CheckCircle, PlayArrow, MonetizationOn } from '@mui/icons-material'
 import { useNavigate } from '../lib/router'
 import ModeratorPractice from './ModeratorPractice'
-import axios from 'axios'
-
-// Configure axios base URL
-const apiBaseUrl = import.meta.env.MODE === 'production' 
-  ? import.meta.env.VITE_API_BASE_URL_PROD 
-  : import.meta.env.VITE_API_BASE_URL
-axios.defaults.baseURL = apiBaseUrl
+import api from '../lib/api'
 
 interface Question {
   _id: string
@@ -52,7 +46,7 @@ const Practice: React.FC = () => {
   
   const fetchUserCoins = async () => {
     try {
-      const response = await axios.get('/user/progress', { headers })
+      const response = await api.get('/user/progress', { headers })
       setUserCoins(response.data.totalCoins || 0)
     } catch (error) {
       console.error('Error fetching user coins:', error)
@@ -61,12 +55,14 @@ const Practice: React.FC = () => {
   
   const fetchTopics = async () => {
     try {
-      const response = await axios.get('/moderator/topics', { headers })
+      console.log('Fetching topics from:', api.defaults.baseURL + '/moderator/topics')
+      const response = await api.get('/moderator/topics', { headers })
+      console.log('Topics response:', response.data)
       
       // Fetch user progress to mark completed questions
       let completedQuestionIds: string[] = []
       try {
-        const progressResponse = await axios.get('/user/progress', { headers })
+        const progressResponse = await api.get('/user/progress', { headers })
         completedQuestionIds = progressResponse.data.completedQuestions?.map((q: any) => 
           typeof q === 'string' ? q : q._id
         ) || []
@@ -74,12 +70,13 @@ const Practice: React.FC = () => {
         console.error('Error fetching user progress:', error)
       }
       
-      const topicsData = response.data.map((topic: any, index: number) => ({
+      const topicsData = Array.isArray(response.data) ? response.data.map((topic: any, index: number) => ({
         ...topic,
         questions: [],
         completed: false,
         unlocked: index === 0 // Only first topic unlocked initially
-      }))
+      })) : []
+      console.log('Processed topics data:', topicsData)
       setTopics(topicsData)
       
       // Fetch questions for each topic and update unlock status
@@ -88,6 +85,7 @@ const Practice: React.FC = () => {
       }
     } catch (error) {
       console.error('Error fetching topics:', error)
+      setTopics([])
     } finally {
       setLoading(false)
     }
@@ -95,7 +93,7 @@ const Practice: React.FC = () => {
   
   const fetchQuestionsForTopic = async (topicId: string, completedQuestionIds: string[], topicIndex: number) => {
     try {
-      const response = await axios.get(`/moderator/topics/${topicId}/questions`, { headers })
+      const response = await api.get(`/moderator/topics/${topicId}/questions`, { headers })
       const questionsWithCompletion = response.data.map((q: any) => ({
         ...q,
         completed: completedQuestionIds.includes(q._id)

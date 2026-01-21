@@ -3,13 +3,7 @@ import { Box, Typography, Card, CardContent, TextField, Select, MenuItem, FormCo
 import { ArrowBack, Add, Delete, Code, Quiz, Visibility, VisibilityOff, Save } from '@mui/icons-material'
 import { useNavigate } from '../lib/router'
 import { useTheme } from '../lib/ThemeContext'
-import axios from 'axios'
-
-// Configure axios base URL
-const apiBaseUrl = import.meta.env.MODE === 'production' 
-  ? import.meta.env.VITE_API_BASE_URL_PROD 
-  : import.meta.env.VITE_API_BASE_URL
-axios.defaults.baseURL = apiBaseUrl
+import api from '../lib/api'
 
 const CreateQuestion: React.FC = () => {
   const navigate = useNavigate()
@@ -38,7 +32,7 @@ const CreateQuestion: React.FC = () => {
 
   const fetchTopics = async () => {
     try {
-      const response = await axios.get('/moderator/topics', { headers })
+      const response = await api.get('/moderator/topics', { headers })
       setTopics(response.data)
     } catch (error) {
       console.error('Error fetching topics:', error)
@@ -93,7 +87,7 @@ const CreateQuestion: React.FC = () => {
         }
       }
       
-      await axios.post('/moderator/questions', payload, { headers })
+      await api.post('/moderator/questions', payload, { headers })
       navigate('/practice')
     } catch (error: any) {
       console.error('Error creating question:', error)

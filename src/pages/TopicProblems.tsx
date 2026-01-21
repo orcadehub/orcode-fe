@@ -4,15 +4,10 @@ import { ArrowBack, Code, CheckCircle, Lock, Menu, Close, PlayArrow, LightMode, 
 import { useNavigate, useParams } from '../lib/router'
 import { useTheme } from '../lib/ThemeContext'
 import { userAPI } from '../lib/api'
-import axios from 'axios'
+import api from '../lib/api'
 import toast from 'react-hot-toast'
 import logo from '../logo.jpeg'
 
-// Configure axios base URL
-const apiBaseUrl = import.meta.env.MODE === 'production' 
-  ? import.meta.env.VITE_API_BASE_URL_PROD 
-  : import.meta.env.VITE_API_BASE_URL
-axios.defaults.baseURL = apiBaseUrl
 
 interface Question {
   _id: string
@@ -74,6 +69,34 @@ const TopicProblems: React.FC = () => {
   const [selectedSubmission, setSelectedSubmission] = useState<any>(null)
   const [codeModalOpen, setCodeModalOpen] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [copyAttemptModal, setCopyAttemptModal] = useState(false)
+  
+  // Disable copy/paste activities
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'v' || e.key === 'x' || e.key === 'a')) {
+        e.preventDefault()
+        setCopyAttemptModal(true)
+      }
+    }
+    
+    const handleCopy = (e) => {
+      e.preventDefault()
+      setCopyAttemptModal(true)
+    }
+    
+    document.addEventListener('keydown', handleKeyDown)
+    document.addEventListener('copy', handleCopy)
+    document.addEventListener('cut', handleCopy)
+    document.addEventListener('paste', handleCopy)
+    
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      document.removeEventListener('copy', handleCopy)
+      document.removeEventListener('cut', handleCopy)
+      document.removeEventListener('paste', handleCopy)
+    }
+  }, [])
   
   const token = localStorage.getItem('token')
   const headers = { Authorization: `Bearer ${token}` }
@@ -121,6 +144,9 @@ const TopicProblems: React.FC = () => {
     if (currentProblem && isLoggedIn && language && editorRef.current) {
       loadSavedCode()
     }
+    // Clear submission results when problem changes
+    setSubmissionResult(null)
+    setFailedTestCase(null)
   }, [currentProblemIndex, language, isLoggedIn])
   
   // Load submissions when problem changes
@@ -132,7 +158,7 @@ const TopicProblems: React.FC = () => {
   
   const loadSavedCode = async () => {
     try {
-      const response = await axios.get(`/user/code/${currentProblem._id}/${language}`, { headers })
+      const response = await api.get(`/user/code/${currentProblem._id}/${language}`, { headers })
       if (response.data.code) {
         setCode(response.data.code)
         
@@ -161,7 +187,7 @@ const TopicProblems: React.FC = () => {
   
   const fetchUserCoins = async () => {
     try {
-      const response = await axios.get('/user/progress', { headers })
+      const response = await api.get('/user/progress', { headers })
       setUserCoins(response.data.totalCoins || 0)
     } catch (error) {
       console.error('Error fetching user coins:', error)
@@ -187,20 +213,20 @@ const TopicProblems: React.FC = () => {
     try {
       console.log('Fetching topic and questions for topicId:', topicId)
       // Fetch topic details
-      const topicsResponse = await axios.get('/moderator/topics', { headers })
+      const topicsResponse = await api.get('/moderator/topics', { headers })
       console.log('Topics response:', topicsResponse.data)
       const topicData = topicsResponse.data.find((t: any) => t._id === topicId)
       console.log('Found topic:', topicData)
       setTopic(topicData)
       
       // Fetch questions for this topic
-      const questionsResponse = await axios.get(`/moderator/topics/${topicId}/questions`, { headers })
+      const questionsResponse = await api.get(`/moderator/topics/${topicId}/questions`, { headers })
       console.log('Questions response:', questionsResponse.data)
       
       // Fetch user progress to mark completed questions
       let completedQuestionIds: string[] = []
       try {
-        const progressResponse = await axios.get('/user/progress', { headers })
+        const progressResponse = await api.get('/user/progress', { headers })
         console.log('User progress:', progressResponse.data)
         completedQuestionIds = progressResponse.data.completedQuestions?.map((q: any) => 
           typeof q === 'string' ? q : q._id
@@ -285,17 +311,39 @@ const TopicProblems: React.FC = () => {
           autoClosingQuotes: 'always',
           autoSurround: 'languageDefined',
           bracketPairColorization: { enabled: true },
-          suggest: {
-            showKeywords: true,
-            showSnippets: true
-          }
+          contextmenu: true,
         })
 
         // Update code state when editor content changes
         editorRef.current.onDidChangeModelContent(() => {
           if (editorRef.current) {
             setCode(editorRef.current.getValue())
+            // Auto close sidebar when user starts typing
+            if (sidebarOpen) {
+              setSidebarOpen(false)
+            }
           }
+        })
+
+        // Add keyboard shortcuts override and paste detection
+        editorRef.current.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyC, () => {
+          setCopyAttemptModal(true)
+        })
+        editorRef.current.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyV, () => {
+          setCopyAttemptModal(true)
+        })
+        editorRef.current.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyX, () => {
+          setCopyAttemptModal(true)
+        })
+        editorRef.current.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyA, () => {
+          setCopyAttemptModal(true)
+        })
+        
+        // Override paste action
+        editorRef.current.onDidPaste(() => {
+          setCopyAttemptModal(true)
+          // Undo the paste
+          editorRef.current.trigger('keyboard', 'undo', null)
         })
 
         // Load saved code immediately after editor is created
@@ -339,13 +387,19 @@ const TopicProblems: React.FC = () => {
 
   const currentProblem = problems[currentProblemIndex]
   const completedCount = problems.filter(p => p.completed).length
+  
+  // Clear submission results when problem changes
+  useEffect(() => {
+    setSubmissionResult(null)
+    setFailedTestCase(null)
+  }, [currentProblemIndex])
 
   const handleRunCode = async () => {
     if (!code.trim() || !language) return
     
     // Save current code to database
     try {
-      await axios.post('/user/save-code', {
+      await api.post('/user/save-code', {
         questionId: currentProblem._id,
         code,
         language
@@ -501,7 +555,7 @@ const TopicProblems: React.FC = () => {
         if (userOutput !== testCase.output) {
           // Record failed submission
           const timeTaken = Date.now() - startTime
-          await axios.post('/user/submit', {
+          await api.post('/user/submit', {
             questionId: currentProblem._id,
             code,
             language,
@@ -535,7 +589,7 @@ const TopicProblems: React.FC = () => {
       const timeTaken = Date.now() - startTime
       
       // Record successful submission
-      await axios.post('/user/submit', {
+      await api.post('/user/submit', {
         questionId: currentProblem._id,
         code,
         language,
@@ -583,6 +637,9 @@ const TopicProblems: React.FC = () => {
       setCurrentProblemIndex(index)
       setCode('')
       setOutput('')
+      setSubmissionResult(null)
+      setFailedTestCase(null)
+      setSidebarOpen(false)
       // Clear Monaco Editor
       if (editorRef.current) {
         editorRef.current.setValue('')
@@ -643,7 +700,7 @@ const TopicProblems: React.FC = () => {
     
     const rect = container.getBoundingClientRect()
     const newPosition = ((e.clientY - rect.top) / rect.height) * 100
-    setCompilerSplit(Math.min(Math.max(newPosition, 30), 80))
+    setCompilerSplit(Math.min(Math.max(newPosition, 20), 85))
     
     // Force Monaco Editor to resize during drag
     if (editorRef.current) {
@@ -709,7 +766,7 @@ const TopicProblems: React.FC = () => {
   }
 
   return (
-    <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+    <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden', userSelect: 'none' }}>
       {/* Sidebar */}
       <Drawer
         variant="persistent"
@@ -834,36 +891,28 @@ const TopicProblems: React.FC = () => {
         {/* Header */}
         <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 2 }}>
           {!sidebarOpen && (
-            <IconButton 
+            <Button
+              variant="contained"
+              startIcon={<Menu />}
               onClick={() => setSidebarOpen(true)}
               sx={{ 
-                p: 1.5,
+                px: 3,
+                py: 1,
+                fontWeight: 600,
+                textTransform: 'none',
                 borderRadius: 2,
-                '&:hover': { bgcolor: 'grey.100' }
+                bgcolor: 'primary.main',
+                color: isDark ? 'black' : 'white',
+                '&:hover': { bgcolor: 'primary.dark' }
               }}
             >
-              <Menu />
-            </IconButton>
+              Problems
+            </Button>
           )}
-          <Button 
-            startIcon={<ArrowBack />}
-            onClick={() => navigate('/practice')}
-            sx={{
-              px: 3,
-              py: 1,
-              fontWeight: 500,
-              textTransform: 'none',
-              borderRadius: 2,
-              color: 'grey.700',
-              '&:hover': { bgcolor: 'grey.100' }
-            }}
-          >
-            Back to Topics
-          </Button>
           
           <Box sx={{ flexGrow: 1 }} />
           
-          <Box 
+            <Box 
             sx={{ 
               display: 'flex', 
               alignItems: 'center', 
@@ -901,7 +950,7 @@ const TopicProblems: React.FC = () => {
                 ODE
               </Typography>
             </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 2 }}>
+            <Box sx={{ display: 'none', alignItems: 'center', gap: 1, ml: 2 }}>
               <MonetizationOn sx={{ color: 'warning.main', fontSize: '1.5rem' }} />
               <Typography variant="h6" sx={{ fontWeight: 600, color: 'warning.main' }}>
                 {userCoins} ORCS
@@ -984,8 +1033,8 @@ const TopicProblems: React.FC = () => {
             sx={{ 
               p: 1.5,
               borderRadius: 2,
-              color: 'text.primary',
-              '&:hover': { bgcolor: 'grey.100' }
+              color: isDark ? 'white' : 'text.primary',
+              '&:hover': { bgcolor: isDark ? 'grey.800' : 'grey.100' }
             }}
           >
             {isDark ? <LightMode /> : <DarkMode />}
@@ -1432,9 +1481,9 @@ const TopicProblems: React.FC = () => {
             sx={{
               width: '4px',
               cursor: 'col-resize',
-              bgcolor: 'warning.main',
+              bgcolor: isDark ? '#f39c12' : '#6a0dad',
               '&:hover': {
-                bgcolor: 'warning.dark'
+                bgcolor: isDark ? '#e67e22' : '#5a0b9a'
               }
             }}
             onMouseDown={handleMouseDown}
@@ -1455,17 +1504,17 @@ const TopicProblems: React.FC = () => {
           }} data-compiler-container>
             <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               {isFullscreen && (
-                <Box 
-                  sx={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: 1, 
-                    backgroundColor: 'white', 
-                    borderRadius: 2, 
-                    px: 2, 
-                    py: 1
-                  }}
-                >
+                  <Box 
+                    sx={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: 1, 
+                      backgroundColor: 'white', 
+                      borderRadius: 2, 
+                      px: 2, 
+                      py: 1
+                    }}
+                  >
                   <img 
                     src={logo} 
                     alt="ORCADEHUB" 
@@ -1688,11 +1737,11 @@ const TopicProblems: React.FC = () => {
                 sx={{
                   height: '4px',
                   cursor: 'row-resize',
-                  bgcolor: 'info.main',
+                  bgcolor: isDark ? '#f39c12' : '#6a0dad',
                   position: 'relative',
                   zIndex: 200,
                   '&:hover': {
-                    bgcolor: 'info.dark'
+                    bgcolor: isDark ? '#e67e22' : '#5a0b9a'
                   }
                 }}
                 onMouseDown={handleCompilerMouseDown}
@@ -2263,6 +2312,84 @@ const TopicProblems: React.FC = () => {
             sx={{ textTransform: 'none' }}
           >
             Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+      
+      {/* Copy Attempt Warning Modal */}
+      <Dialog 
+        open={copyAttemptModal} 
+        onClose={() => setCopyAttemptModal(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            bgcolor: 'background.paper',
+            borderRadius: 3,
+            boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
+            border: '2px solid #ff4444'
+          }
+        }}
+      >
+        <DialogContent sx={{ p: 0, textAlign: 'center' }}>
+          <Box sx={{ 
+            bgcolor: 'linear-gradient(135deg, #ff4444 0%, #cc0000 100%)',
+            background: 'linear-gradient(135deg, #ff4444 0%, #cc0000 100%)',
+            color: 'white',
+            p: 4,
+            borderRadius: '12px 12px 0 0'
+          }}>
+            <Typography variant="h2" sx={{ fontSize: '4rem', mb: 1 }}>🚫</Typography>
+            <Typography variant="h4" sx={{ fontWeight: 800, mb: 1 }}>
+              COPY/PASTE BLOCKED
+            </Typography>
+            <Typography variant="h6" sx={{ opacity: 0.9 }}>
+              Nice try, but we're watching! 👀
+            </Typography>
+          </Box>
+          
+          <Box sx={{ p: 4, bgcolor: 'background.paper' }}>
+            <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, color: 'text.primary' }}>
+              Seriously? Trying to cheat already? 🤔
+            </Typography>
+            <Typography variant="body1" sx={{ mb: 3, color: 'text.secondary', lineHeight: 1.6 }}>
+              Copy-paste is for recipes, not for coding skills! This is your chance to actually learn something. 
+              Stop looking for shortcuts and start building your brain muscles! 💪
+            </Typography>
+            <Box sx={{ 
+              bgcolor: isDark ? 'grey.900' : 'grey.50', 
+              p: 3, 
+              borderRadius: 2,
+              border: '1px solid',
+              borderColor: 'divider'
+            }}>
+              <Typography variant="body2" sx={{ fontStyle: 'italic', color: 'text.secondary' }}>
+                "The only way to learn programming is to program. Copying code is like trying to learn swimming by watching YouTube." 🏊‍♂️
+              </Typography>
+            </Box>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ 
+          justifyContent: 'center', 
+          p: 3, 
+          bgcolor: 'background.paper',
+          borderRadius: '0 0 12px 12px'
+        }}>
+          <Button 
+            onClick={() => setCopyAttemptModal(false)}
+            variant="contained"
+            size="large"
+            sx={{ 
+              px: 6, 
+              py: 1.5,
+              fontWeight: 600,
+              textTransform: 'none',
+              borderRadius: 2,
+              bgcolor: '#ff4444',
+              '&:hover': { bgcolor: '#cc0000' }
+            }}
+          >
+            Fine, I'll Code Properly! 😤
           </Button>
         </DialogActions>
       </Dialog>
