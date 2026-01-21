@@ -6,6 +6,7 @@ import { useTheme } from '../lib/ThemeContext'
 import { userAPI } from '../lib/api'
 import axios from 'axios'
 import toast from 'react-hot-toast'
+import logo from '../logo.jpeg'
 
 // Configure axios base URL
 const apiBaseUrl = import.meta.env.MODE === 'production' 
@@ -874,7 +875,7 @@ const TopicProblems: React.FC = () => {
             }}
           >
             <img 
-              src="/src/logo.jpeg" 
+              src={logo} 
               alt="ORCADEHUB" 
               style={{ height: '32px', width: 'auto' }}
             />
@@ -1466,7 +1467,7 @@ const TopicProblems: React.FC = () => {
                   }}
                 >
                   <img 
-                    src="/src/logo.jpeg" 
+                    src={logo} 
                     alt="ORCADEHUB" 
                     style={{ height: '28px', width: 'auto' }}
                   />
