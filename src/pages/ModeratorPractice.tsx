@@ -35,10 +35,10 @@ const ModeratorPractice: React.FC = () => {
 
   const fetchStats = async () => {
     try {
-      const topicsResponse = await axios.get('/api/moderator/topics', { headers })
+      const topicsResponse = await axios.get('/moderator/topics', { headers })
       let totalQuestions = 0
       for (const topic of topicsResponse.data) {
-        const questionsResponse = await axios.get(`/api/moderator/topics/${topic._id}/questions`, { headers })
+        const questionsResponse = await axios.get(`/moderator/topics/${topic._id}/questions`, { headers })
         totalQuestions += questionsResponse.data.length
       }
       setStats({
@@ -53,7 +53,7 @@ const ModeratorPractice: React.FC = () => {
 
   const fetchActivities = async () => {
     try {
-      const response = await axios.get('/api/user/activities', { headers })
+      const response = await axios.get('/user/activities', { headers })
       setActivities(response.data)
     } catch (error) {
       console.error('Error fetching activities:', error)
@@ -75,7 +75,7 @@ const ModeratorPractice: React.FC = () => {
 
   const fetchTopics = async () => {
     try {
-      const response = await axios.get('/api/moderator/topics', { headers })
+      const response = await axios.get('/moderator/topics', { headers })
       setTopics(response.data)
     } catch (error) {
       console.error('Error fetching topics:', error)
@@ -84,7 +84,7 @@ const ModeratorPractice: React.FC = () => {
 
   const fetchQuestions = async (topicId: string) => {
     try {
-      const response = await axios.get(`/api/moderator/topics/${topicId}/questions`, { headers })
+      const response = await axios.get(`/moderator/topics/${topicId}/questions`, { headers })
       setQuestions(response.data)
     } catch (error) {
       console.error('Error fetching questions:', error)
@@ -100,11 +100,11 @@ const ModeratorPractice: React.FC = () => {
     try {
       if (editingTopic) {
         // Update existing topic
-        await axios.put(`/api/moderator/topics/${editingTopic._id}`, topicForm, { headers })
+        await axios.put(`/moderator/topics/${editingTopic._id}`, topicForm, { headers })
       } else {
         // Create new topic
         const order = topics.length + 1
-        await axios.post('/api/moderator/topics', { ...topicForm, order }, { headers })
+        await axios.post('/moderator/topics', { ...topicForm, order }, { headers })
       }
       setOpenTopicDialog(false)
       setTopicForm({ title: '', description: '', difficulty: 'Easy' })
@@ -145,14 +145,14 @@ const ModeratorPractice: React.FC = () => {
     try {
       if (type === 'topic') {
         await Promise.all([
-          axios.put(`/api/moderator/topics/${newItems[index]._id}`, { order: newItems[index].order }, { headers }),
-          axios.put(`/api/moderator/topics/${newItems[newIndex]._id}`, { order: newItems[newIndex].order }, { headers })
+          axios.put(`/moderator/topics/${newItems[index]._id}`, { order: newItems[index].order }, { headers }),
+          axios.put(`/moderator/topics/${newItems[newIndex]._id}`, { order: newItems[newIndex].order }, { headers })
         ])
         fetchTopics()
       } else {
         await Promise.all([
-          axios.put(`/api/moderator/questions/${newItems[index]._id}`, { order: newItems[index].order }, { headers }),
-          axios.put(`/api/moderator/questions/${newItems[newIndex]._id}`, { order: newItems[newIndex].order }, { headers })
+          axios.put(`/moderator/questions/${newItems[index]._id}`, { order: newItems[index].order }, { headers }),
+          axios.put(`/moderator/questions/${newItems[newIndex]._id}`, { order: newItems[newIndex].order }, { headers })
         ])
         fetchQuestions(selectedTopic._id)
       }

@@ -38,7 +38,7 @@ const CreateQuestion: React.FC = () => {
 
   const fetchTopics = async () => {
     try {
-      const response = await axios.get('/api/moderator/topics', { headers })
+      const response = await axios.get('/moderator/topics', { headers })
       setTopics(response.data)
     } catch (error) {
       console.error('Error fetching topics:', error)
@@ -93,7 +93,7 @@ const CreateQuestion: React.FC = () => {
         }
       }
       
-      await axios.post('/api/moderator/questions', payload, { headers })
+      await axios.post('/moderator/questions', payload, { headers })
       navigate('/practice')
     } catch (error: any) {
       console.error('Error creating question:', error)
