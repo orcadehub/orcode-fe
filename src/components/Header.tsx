@@ -3,7 +3,7 @@ import { AppBar, Toolbar, Typography, Button, Box, IconButton, Menu, MenuItem, A
 import { LightMode, DarkMode, AccountCircle } from '@mui/icons-material'
 import { useNavigate } from '../lib/router'
 import { useTheme } from '../lib/ThemeContext'
-import logo from '../assets/logo.jpeg'
+import logo from '../logo.jpeg'
 
 const Header: React.FC = () => {
   const navigate = useNavigate()
