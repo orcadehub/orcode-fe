@@ -18,7 +18,7 @@ const Leaderboard: React.FC = () => {
 
   const fetchLeaderboard = async () => {
     try {
-      const response = await axios.get('/api/user/leaderboard', { headers })
+      const response = await axios.get('/user/leaderboard', { headers })
       setUsers(response.data)
     } catch (error) {
       console.error('Error fetching leaderboard:', error)

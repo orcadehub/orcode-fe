@@ -52,7 +52,7 @@ const UserProfile: React.FC = () => {
   
   const fetchUserProgress = async () => {
     try {
-      const response = await axios.get('/api/user/progress', { headers })
+      const response = await axios.get('/user/progress', { headers })
       setProgress(response.data)
     } catch (error) {
       console.error('Error fetching user progress:', error)

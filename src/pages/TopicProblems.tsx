@@ -131,7 +131,7 @@ const TopicProblems: React.FC = () => {
   
   const loadSavedCode = async () => {
     try {
-      const response = await axios.get(`/api/user/code/${currentProblem._id}/${language}`, { headers })
+      const response = await axios.get(`/user/code/${currentProblem._id}/${language}`, { headers })
       if (response.data.code) {
         setCode(response.data.code)
         
@@ -160,7 +160,7 @@ const TopicProblems: React.FC = () => {
   
   const fetchUserCoins = async () => {
     try {
-      const response = await axios.get('/api/user/progress', { headers })
+      const response = await axios.get('/user/progress', { headers })
       setUserCoins(response.data.totalCoins || 0)
     } catch (error) {
       console.error('Error fetching user coins:', error)
@@ -186,20 +186,20 @@ const TopicProblems: React.FC = () => {
     try {
       console.log('Fetching topic and questions for topicId:', topicId)
       // Fetch topic details
-      const topicsResponse = await axios.get('/api/moderator/topics', { headers })
+      const topicsResponse = await axios.get('/moderator/topics', { headers })
       console.log('Topics response:', topicsResponse.data)
       const topicData = topicsResponse.data.find((t: any) => t._id === topicId)
       console.log('Found topic:', topicData)
       setTopic(topicData)
       
       // Fetch questions for this topic
-      const questionsResponse = await axios.get(`/api/moderator/topics/${topicId}/questions`, { headers })
+      const questionsResponse = await axios.get(`/moderator/topics/${topicId}/questions`, { headers })
       console.log('Questions response:', questionsResponse.data)
       
       // Fetch user progress to mark completed questions
       let completedQuestionIds: string[] = []
       try {
-        const progressResponse = await axios.get('/api/user/progress', { headers })
+        const progressResponse = await axios.get('/user/progress', { headers })
         console.log('User progress:', progressResponse.data)
         completedQuestionIds = progressResponse.data.completedQuestions?.map((q: any) => 
           typeof q === 'string' ? q : q._id
@@ -344,7 +344,7 @@ const TopicProblems: React.FC = () => {
     
     // Save current code to database
     try {
-      await axios.post('/api/user/save-code', {
+      await axios.post('/user/save-code', {
         questionId: currentProblem._id,
         code,
         language
@@ -500,7 +500,7 @@ const TopicProblems: React.FC = () => {
         if (userOutput !== testCase.output) {
           // Record failed submission
           const timeTaken = Date.now() - startTime
-          await axios.post('/api/user/submit', {
+          await axios.post('/user/submit', {
             questionId: currentProblem._id,
             code,
             language,
@@ -534,7 +534,7 @@ const TopicProblems: React.FC = () => {
       const timeTaken = Date.now() - startTime
       
       // Record successful submission
-      await axios.post('/api/user/submit', {
+      await axios.post('/user/submit', {
         questionId: currentProblem._id,
         code,
         language,
