@@ -64,7 +64,7 @@ const Header: React.FC = () => {
             onClick={() => navigate(user ? '/dashboard' : '/')}
           >
             <img 
-              src="/src/logo.jpeg" 
+              src="/logo.jpeg" 
               alt="ORCADEHUB" 
               style={{ height: '40px', width: 'auto' }}
             />
