@@ -3,6 +3,7 @@ import { AppBar, Toolbar, Typography, Button, Box, IconButton, Menu, MenuItem, A
 import { LightMode, DarkMode, AccountCircle } from '@mui/icons-material'
 import { useNavigate } from '../lib/router'
 import { useTheme } from '../lib/ThemeContext'
+import logo from '../assets/logo.jpeg'
 
 const Header: React.FC = () => {
   const navigate = useNavigate()
@@ -64,7 +65,7 @@ const Header: React.FC = () => {
             onClick={() => navigate(user ? '/dashboard' : '/')}
           >
             <img 
-              src="/logo.jpeg" 
+              src={logo} 
               alt="ORCADEHUB" 
               style={{ height: '40px', width: 'auto' }}
             />
