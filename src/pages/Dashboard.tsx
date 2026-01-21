@@ -3,7 +3,7 @@ import { Container, Typography, Box, Card, CardContent, Grid, Avatar, Chip, Tabl
 import { Code, TrendingUp, EmojiEvents, MonetizationOn, AccessTime, CheckCircle, Person, Timeline, Share, ContentCopy } from '@mui/icons-material'
 import { useTheme } from '../lib/ThemeContext'
 import { userAPI } from '../lib/api'
-import axios from 'axios'
+import api from '../lib/api'
 
 const Dashboard: React.FC = () => {
   const { isDark } = useTheme()
@@ -30,7 +30,7 @@ const Dashboard: React.FC = () => {
   
   const fetchDashboardData = async () => {
     try {
-      const progressResponse = await axios.get('/api/user/progress', { headers })
+      const progressResponse = await api.get('/user/progress', { headers })
       setProgress(progressResponse.data)
       
       if (token) {
