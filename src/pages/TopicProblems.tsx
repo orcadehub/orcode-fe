@@ -499,59 +499,42 @@ const TopicProblems: React.FC = () => {
   }, [currentProblemIndex])
 
   const executeCode = async (code, language, input, timeout = 10000) => {
-    const languageMap = {
-      cpp: 'cpp',
-      java: 'java',
-      python: 'python',
-      c: 'c'
-    }
-
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), timeout)
 
     try {
-      const response = await fetch('https://emkc.org/api/v2/piston/execute', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          language: languageMap[language as keyof typeof languageMap],
-          version: '*',
-          files: [{ content: code }],
-          stdin: input.replace('\\n', '\n')
-        }),
+      const response = await api.post('/compiler/execute', {
+        code,
+        language,
+        input: input.replace('\\n', '\n')
+      }, {
+        headers,
         signal: controller.signal
       })
 
       clearTimeout(timeoutId)
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      if (response.data.success) {
+        // Check for compilation errors first
+        if (response.data.compile_error) {
+          return { output: `Compilation Error:\n${response.data.compile_error}`, executionTime: 0 }
+        }
+        // Check for runtime errors
+        if (response.data.stderr) {
+          return { output: `Runtime Error:\n${response.data.stderr}`, executionTime: response.data.execution_time || 0 }
+        }
+        // Return output with execution time
+        return { output: response.data.stdout || '', executionTime: response.data.execution_time || 0 }
+      } else {
+        return { output: response.data.error || 'Execution failed', executionTime: 0 }
       }
-
-      const result = await response.json()
-      
-      let userOutput = ''
-      
-      if (result.run) {
-        if (result.run.stdout) {
-          userOutput = result.run.stdout.trim()
-        }
-        if (result.run.stderr) {
-          userOutput = 'Error: ' + result.run.stderr
-        }
-        if (result.compile && result.compile.stderr) {
-          userOutput = 'Compile Error: ' + result.compile.stderr
-        }
-      }
-      
-      return userOutput || 'No output'
       
     } catch (error) {
       clearTimeout(timeoutId)
       if (error.name === 'AbortError') {
-        return 'Timeout: Code execution took too long'
+        return { output: 'Timeout: Code execution took too long', executionTime: 0 }
       }
-      return `Connection error: ${error.message}`
+      return { output: `Execution error: ${error.response?.data?.error || error.message}`, executionTime: 0 }
     }
   }
   const handleRunCode = useCallback(async () => {
@@ -580,8 +563,8 @@ const TopicProblems: React.FC = () => {
         const testCase = currentProblem.testCases.public[i]
         
         try {
-          const userOutput = await executeCode(code, language, testCase.input)
-          updatedTestCases.push({ ...testCase, userOutput })
+          const result = await executeCode(code, language, testCase.input)
+          updatedTestCases.push({ ...testCase, userOutput: result.output })
           
           // Small delay between requests
           if (i < currentProblem.testCases.public.length - 1) {
@@ -623,7 +606,7 @@ const TopicProblems: React.FC = () => {
     setFailedTestCase(null)
     setSubmissionResult(null)
     
-    const startTime = Date.now()
+    let executionTimes = []
     
     try {
       // Run all test cases (public + private)
@@ -632,19 +615,24 @@ const TopicProblems: React.FC = () => {
       
       for (const testCase of allTestCases) {
         try {
-          const userOutput = await executeCode(code, language, testCase.input, 15000) // 15s timeout for submission
+          const result = await executeCode(code, language, testCase.input, 15000) // 15s timeout for submission
+          
+          // Collect execution times
+          executionTimes.push(result.executionTime)
           
           // Check if test case failed
-          if (userOutput !== testCase.output) {
+          if (result.output.trim() !== testCase.output.trim()) {
+            // Calculate average execution time
+            const avgExecutionTime = Math.round(executionTimes.reduce((a, b) => a + b, 0) / executionTimes.length)
+            
             // Record failed submission
-            const timeTaken = Date.now() - startTime
             await api.post('/user/submit', {
               questionId: currentProblem._id,
               code,
               language,
               status: 'failed',
-              runtime: timeTaken,
-              memory: Math.round(timeTaken / 200),
+              runtime: avgExecutionTime,
+              memory: Math.round(avgExecutionTime / 200),
               testCasesPassed: passedCount,
               totalTestCases: allTestCases.length
             }, { headers })
@@ -657,7 +645,7 @@ const TopicProblems: React.FC = () => {
             setFailedTestCase({
               input: testCase.input,
               output: testCase.output,
-              userOutput: userOutput,
+              userOutput: result.output,
               passedCount: passedCount,
               totalCount: allTestCases.length
             })
@@ -669,14 +657,15 @@ const TopicProblems: React.FC = () => {
           
         } catch (error) {
           // Handle execution error as failed test case
-          const timeTaken = Date.now() - startTime
+          const avgExecutionTime = executionTimes.length > 0 ? Math.round(executionTimes.reduce((a, b) => a + b, 0) / executionTimes.length) : 0
+          
           await api.post('/user/submit', {
             questionId: currentProblem._id,
             code,
             language,
             status: 'failed',
-            runtime: timeTaken,
-            memory: Math.round(timeTaken / 200),
+            runtime: avgExecutionTime,
+            memory: Math.round(avgExecutionTime / 200),
             testCasesPassed: passedCount,
             totalTestCases: allTestCases.length
           }, { headers })
@@ -693,8 +682,8 @@ const TopicProblems: React.FC = () => {
         }
       }
       
-      // All test cases passed
-      const timeTaken = Date.now() - startTime
+      // All test cases passed - calculate average execution time
+      const avgExecutionTime = Math.round(executionTimes.reduce((a, b) => a + b, 0) / executionTimes.length)
       
       // Record successful submission
       await api.post('/user/submit', {
@@ -702,8 +691,8 @@ const TopicProblems: React.FC = () => {
         code,
         language,
         status: 'accepted',
-        runtime: timeTaken,
-        memory: Math.round(timeTaken / 200),
+        runtime: avgExecutionTime,
+        memory: Math.round(avgExecutionTime / 200),
         testCasesPassed: allTestCases.length,
         totalTestCases: allTestCases.length
       }, { headers })
@@ -719,7 +708,7 @@ const TopicProblems: React.FC = () => {
       setSubmissionResult({
         passed: true,
         totalTests: allTestCases.length,
-        timeTaken: timeTaken
+        timeTaken: avgExecutionTime
       })
       
       const updatedProblems = problems.map((problem, index) => 
@@ -1657,7 +1646,14 @@ const TopicProblems: React.FC = () => {
                                 </TableCell>
                                 <TableCell>
                                   <Typography variant="body2" color="text.secondary">
-                                    {new Date(submission.submittedAt).toLocaleDateString('en-GB')}
+                                    {new Date(submission.submittedAt).toLocaleString('en-GB', {
+                                      day: '2-digit',
+                                      month: '2-digit', 
+                                      year: 'numeric',
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                      second: '2-digit'
+                                    })}
                                   </Typography>
                                 </TableCell>
                               </TableRow>
@@ -1971,8 +1967,10 @@ const TopicProblems: React.FC = () => {
                       >
                         {currentProblem.testCases.public.map((testCase, index) => {
                           const hasUserOutput = testCase.userOutput !== undefined
-                          const isPassed = hasUserOutput && testCase.userOutput === testCase.output
-                          const isFailed = hasUserOutput && testCase.userOutput !== testCase.output
+                          const userOut = testCase.userOutput ? testCase.userOutput.toString().trim() : ''
+                          const expectedOut = testCase.output.toString().trim()
+                          const isPassed = hasUserOutput && userOut === expectedOut
+                          const isFailed = hasUserOutput && userOut !== expectedOut
                           
                           return (
                             <Tab 
@@ -2385,7 +2383,7 @@ const TopicProblems: React.FC = () => {
                             <Box sx={{ 
                               bgcolor: 'background.default',
                               border: '2px solid',
-                              borderColor: currentProblem.testCases.public[tabValue].userOutput === currentProblem.testCases.public[tabValue].output ? 'success.main' : 'error.main',
+                              borderColor: currentProblem.testCases.public[tabValue].userOutput.trim() === currentProblem.testCases.public[tabValue].output.trim() ? 'success.main' : 'error.main',
                               p: 2.5,
                               borderRadius: 2,
                               fontFamily: 'monospace',

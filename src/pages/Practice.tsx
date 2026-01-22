@@ -66,11 +66,15 @@ const Practice: React.FC = () => {
   
   const fetchTopics = async () => {
     try {
-      console.log('Fetching topics from:', api.defaults.baseURL + '/moderator/topics')
       const response = await api.get('/moderator/topics', { headers })
-      console.log('Topics response:', response.data)
       
-      // Fetch user progress to mark completed questions
+      if (!Array.isArray(response.data)) {
+        setTopics([])
+        setLoading(false)
+        return
+      }
+      
+      // Fetch user progress first
       let completedQuestionIds: string[] = []
       try {
         const progressResponse = await api.get('/user/progress', { headers })
@@ -81,21 +85,18 @@ const Practice: React.FC = () => {
         console.error('Error fetching user progress:', error)
       }
       
-      const topicsData = Array.isArray(response.data) ? response.data.map((topic: any, index: number) => ({
+      const topicsData = response.data.map((topic: any, index: number) => ({
         ...topic,
         questions: [],
         completed: false,
-        unlocked: index === 0 // Only first topic unlocked initially
-      })) : []
-      console.log('Processed topics data:', topicsData)
+        unlocked: index === 0
+      }))
       setTopics(topicsData)
       
-      // Fetch questions for each topic and update unlock status
       for (let i = 0; i < topicsData.length; i++) {
         await fetchQuestionsForTopic(topicsData[i]._id, completedQuestionIds, i)
       }
-    } catch (error) {
-      console.error('Error fetching topics:', error)
+    } catch (error: any) {
       setTopics([])
     } finally {
       setLoading(false)
@@ -220,70 +221,85 @@ const Practice: React.FC = () => {
         },
         gap: 3
       }}>
-        {topics.map((topic) => {
-          const completedCount = getCompletedCount(topic)
-          const totalCount = topic.questions?.length || 0
-          const progress = totalCount > 0 ? (completedCount / totalCount) * 100 : 0
-
-          return (
-            <Card 
-              key={topic._id}
-              sx={{ 
-                borderRadius: 3,
-                cursor: topic.unlocked ? 'pointer' : 'not-allowed',
-                opacity: topic.unlocked ? 1 : 0.6,
-                border: topic.completed ? '2px solid' : '1px solid',
-                borderColor: topic.completed ? 'success.main' : 'divider',
-                height: '100%',
-                display: 'flex',
-                flexDirection: 'column',
-                transition: 'all 0.3s ease',
-                '&:hover': topic.unlocked ? { 
-                  boxShadow: 6,
-                  transform: 'translateY(-4px)'
-                } : {}
-              }}
-              onClick={() => handleTopicClick(topic)}
+        {topics.length === 0 ? (
+          <Box sx={{ gridColumn: '1 / -1', textAlign: 'center', py: 8 }}>
+            <Typography variant="h6" color="text.secondary">
+              No topics available. Please check your connection or contact support.
+            </Typography>
+            <Button 
+              variant="outlined" 
+              onClick={() => window.location.reload()} 
+              sx={{ mt: 2 }}
             >
-              <CardContent sx={{ p: 3, flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                  <Chip 
-                    label={topic.difficulty} 
-                    color={
-                      topic.difficulty === 'Easy' ? 'success' :
-                      topic.difficulty === 'Medium' ? 'warning' : 'error'
-                    } 
-                    size="small" 
-                  />
-                  <Box>
-                    {!topic.unlocked && <Lock sx={{ color: 'text.secondary', fontSize: 24 }} />}
-                    {topic.completed && <CheckCircle sx={{ color: 'success.main', fontSize: 24 }} />}
-                    {topic.unlocked && !topic.completed && <PlayArrow sx={{ color: 'primary.main', fontSize: 24 }} />}
+              Refresh Page
+            </Button>
+          </Box>
+        ) : (
+          topics.map((topic) => {
+            const completedCount = getCompletedCount(topic)
+            const totalCount = topic.questions?.length || 0
+            const progress = totalCount > 0 ? (completedCount / totalCount) * 100 : 0
+
+            return (
+              <Card 
+                key={topic._id}
+                sx={{ 
+                  borderRadius: 3,
+                  cursor: topic.unlocked ? 'pointer' : 'not-allowed',
+                  opacity: topic.unlocked ? 1 : 0.6,
+                  border: topic.completed ? '2px solid' : '1px solid',
+                  borderColor: topic.completed ? 'success.main' : 'divider',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  transition: 'all 0.3s ease',
+                  '&:hover': topic.unlocked ? { 
+                    boxShadow: 6,
+                    transform: 'translateY(-4px)'
+                  } : {}
+                }}
+                onClick={() => handleTopicClick(topic)}
+              >
+                <CardContent sx={{ p: 3, flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                    <Chip 
+                      label={topic.difficulty} 
+                      color={
+                        topic.difficulty === 'Easy' ? 'success' :
+                        topic.difficulty === 'Medium' ? 'warning' : 'error'
+                      } 
+                      size="small" 
+                    />
+                    <Box>
+                      {!topic.unlocked && <Lock sx={{ color: 'text.secondary', fontSize: 24 }} />}
+                      {topic.completed && <CheckCircle sx={{ color: 'success.main', fontSize: 24 }} />}
+                      {topic.unlocked && !topic.completed && <PlayArrow sx={{ color: 'primary.main', fontSize: 24 }} />}
+                    </Box>
                   </Box>
-                </Box>
-                
-                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, minHeight: '3rem', display: 'flex', alignItems: 'center' }}>
-                  {topic.title}
-                </Typography>
-                
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 3, flexGrow: 1, lineHeight: 1.5 }}>
-                  {topic.description}
-                </Typography>
-                
-                <Box sx={{ mt: 'auto' }}>
-                  <LinearProgress 
-                    variant="determinate" 
-                    value={progress}
-                    sx={{ borderRadius: 1, height: 8, mb: 1 }}
-                  />
-                  <Typography variant="caption" color="text.secondary">
-                    {completedCount}/{totalCount} problems completed
+                  
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, minHeight: '3rem', display: 'flex', alignItems: 'center' }}>
+                    {topic.title}
                   </Typography>
-                </Box>
-              </CardContent>
-            </Card>
-          )
-        })}
+                  
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3, flexGrow: 1, lineHeight: 1.5 }}>
+                    {topic.description}
+                  </Typography>
+                  
+                  <Box sx={{ mt: 'auto' }}>
+                    <LinearProgress 
+                      variant="determinate" 
+                      value={progress}
+                      sx={{ borderRadius: 1, height: 8, mb: 1 }}
+                    />
+                    <Typography variant="caption" color="text.secondary">
+                      {completedCount}/{totalCount} problems completed
+                    </Typography>
+                  </Box>
+                </CardContent>
+              </Card>
+            )
+          })
+        )}
       </Box>
     </Container>
   )
