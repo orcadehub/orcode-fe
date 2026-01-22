@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { Container, Typography, Box, Card, CardContent, Button, Chip, LinearProgress } from '@mui/material'
-import { Lock, CheckCircle, PlayArrow, MonetizationOn } from '@mui/icons-material'
+import { Container, Typography, Box, Card, CardContent, Button, Chip, LinearProgress, Skeleton } from '@mui/material'
+import { Lock, CheckCircle, PlayArrow, Toll } from '@mui/icons-material'
 import { useNavigate } from '../lib/router'
 import ModeratorPractice from './ModeratorPractice'
 import api from '../lib/api'
@@ -30,6 +30,7 @@ const Practice: React.FC = () => {
   const [topics, setTopics] = useState<Topic[]>([])
   const [loading, setLoading] = useState(true)
   const [userCoins, setUserCoins] = useState(0)
+  const [totalStudents, setTotalStudents] = useState(0)
   
   const token = localStorage.getItem('token')
   const headers = { Authorization: `Bearer ${token}` }
@@ -42,6 +43,7 @@ const Practice: React.FC = () => {
     }
     fetchTopics()
     fetchUserCoins()
+    fetchStudentCount()
   }, [])
   
   const fetchUserCoins = async () => {
@@ -50,6 +52,15 @@ const Practice: React.FC = () => {
       setUserCoins(response.data.totalCoins || 0)
     } catch (error) {
       console.error('Error fetching user coins:', error)
+    }
+  }
+  
+  const fetchStudentCount = async () => {
+    try {
+      const response = await api.get('/user/student-count', { headers })
+      setTotalStudents(response.data.totalStudents || 0)
+    } catch (error) {
+      console.error('Error fetching student count:', error)
     }
   }
   
@@ -138,8 +149,46 @@ const Practice: React.FC = () => {
 
   if (loading) {
     return (
-      <Container maxWidth="md" sx={{ mt: 4, mb: 8 }}>
-        <Typography>Loading topics...</Typography>
+      <Container maxWidth="xl" sx={{ mt: 4, mb: 8 }}>
+        {/* Header skeleton */}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+          <Skeleton variant="text" width={120} height={40} />
+          <Skeleton variant="text" width={100} height={30} />
+        </Box>
+
+        {/* Title skeleton */}
+        <Box sx={{ textAlign: 'center', mb: 6 }}>
+          <Skeleton variant="text" width={300} height={50} sx={{ mx: 'auto', mb: 2 }} />
+          <Skeleton variant="text" width={400} height={30} sx={{ mx: 'auto' }} />
+        </Box>
+
+        {/* Cards skeleton */}
+        <Box sx={{ 
+          display: 'grid', 
+          gridTemplateColumns: {
+            xs: '1fr',
+            sm: 'repeat(2, 1fr)',
+            md: 'repeat(3, 1fr)',
+            lg: 'repeat(4, 1fr)'
+          },
+          gap: 3
+        }}>
+          {[...Array(8)].map((_, index) => (
+            <Card key={index} sx={{ borderRadius: 3, height: 280 }}>
+              <CardContent sx={{ p: 3 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+                  <Skeleton variant="rectangular" width={60} height={24} sx={{ borderRadius: 1 }} />
+                  <Skeleton variant="circular" width={24} height={24} />
+                </Box>
+                <Skeleton variant="text" width="80%" height={32} sx={{ mb: 2 }} />
+                <Skeleton variant="text" width="100%" height={20} sx={{ mb: 1 }} />
+                <Skeleton variant="text" width="90%" height={20} sx={{ mb: 3 }} />
+                <Skeleton variant="rectangular" width="100%" height={8} sx={{ borderRadius: 1, mb: 1 }} />
+                <Skeleton variant="text" width="60%" height={16} />
+              </CardContent>
+            </Card>
+          ))}
+        </Box>
       </Container>
     )
   }
@@ -151,10 +200,10 @@ const Practice: React.FC = () => {
           Practice Topics
         </Typography>
         <Typography variant="h6" sx={{ color: 'text.secondary', mb: 2 }}>
-          Complete topics sequentially to unlock new challenges
+          Complete topics sequentially to unlock new challenges • <span style={{ color: '#1976d2', fontWeight: 600 }}>{totalStudents} students competing with you</span>
         </Typography>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
-          <MonetizationOn sx={{ color: 'warning.main', fontSize: '1.5rem' }} />
+          <Toll sx={{ color: 'warning.main', fontSize: '1.5rem' }} />
           <Typography variant="h5" sx={{ fontWeight: 600, color: 'warning.main' }}>
             {userCoins} ORCS
           </Typography>

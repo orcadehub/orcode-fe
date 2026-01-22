@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react'
-import { Container, Typography, Box, Card, CardContent, Button, TextField, Chip, LinearProgress, IconButton, Drawer, Tabs, Tab, Select, MenuItem, FormControl, InputLabel, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material'
-import { ArrowBack, Code, CheckCircle, Lock, Menu, Close, PlayArrow, LightMode, DarkMode, Add, Remove, Fullscreen, FullscreenExit, VisibilityOff, Quiz, Speed, Memory, TrendingUp, MonetizationOn, AccessTime, BugReport, ContentCopy, Check } from '@mui/icons-material'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
+import { Container, Typography, Box, Card, CardContent, Button, TextField, Chip, LinearProgress, IconButton, Drawer, Tabs, Tab, Select, MenuItem, FormControl, InputLabel, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Dialog, DialogTitle, DialogContent, DialogActions, Skeleton } from '@mui/material'
+import { ArrowBack, Code, CheckCircle, Lock, Menu, Close, PlayArrow, LightMode, DarkMode, Add, Remove, Fullscreen, FullscreenExit, VisibilityOff, Quiz, Speed, Memory, TrendingUp, Toll, AccessTime, BugReport, ContentCopy, Check } from '@mui/icons-material'
 import { useNavigate, useParams } from '../lib/router'
 import { useTheme } from '../lib/ThemeContext'
 import { userAPI } from '../lib/api'
@@ -71,30 +71,115 @@ const TopicProblems: React.FC = () => {
   const [copied, setCopied] = useState(false)
   const [copyAttemptModal, setCopyAttemptModal] = useState(false)
   
-  // Disable copy/paste activities
+  // Enhanced copy/paste protection with multiple layers
   useEffect(() => {
+    // Layer 1: Keyboard shortcuts
     const handleKeyDown = (e) => {
+      // Ctrl+Enter to run code
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault()
+        if (code.trim() && language && !isRunning) {
+          handleRunCode()
+        }
+        return
+      }
+      
+      // Shift+Enter to submit code
+      if (e.shiftKey && e.key === 'Enter') {
+        e.preventDefault()
+        if (code.trim() && language && !isSubmitting && isLoggedIn) {
+          handleSubmitSolution()
+        }
+        return
+      }
+      
       if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'v' || e.key === 'x' || e.key === 'a')) {
         e.preventDefault()
+        e.stopPropagation()
         setCopyAttemptModal(true)
+        return false
+      }
+      // Block F12, Ctrl+Shift+I, Ctrl+U
+      if (e.key === 'F12' || 
+          ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'I') ||
+          ((e.ctrlKey || e.metaKey) && e.key === 'u')) {
+        e.preventDefault()
+        setCopyAttemptModal(true)
+        return false
       }
     }
     
-    const handleCopy = (e) => {
+    // Layer 2: Clipboard events
+    const handleClipboard = (e) => {
       e.preventDefault()
+      e.stopPropagation()
       setCopyAttemptModal(true)
+      return false
     }
     
-    document.addEventListener('keydown', handleKeyDown)
-    document.addEventListener('copy', handleCopy)
-    document.addEventListener('cut', handleCopy)
-    document.addEventListener('paste', handleCopy)
+    // Layer 3: Context menu
+    const handleContextMenu = (e) => {
+      e.preventDefault()
+      setCopyAttemptModal(true)
+      return false
+    }
+    
+    // Layer 4: Selection prevention
+    const handleSelectStart = (e) => {
+      if (e.target.closest('.monaco-editor')) {
+        return true // Allow selection in Monaco editor
+      }
+      e.preventDefault()
+      return false
+    }
+    
+    // Layer 5: Drag prevention
+    const handleDragStart = (e) => {
+      e.preventDefault()
+      return false
+    }
+    
+    // Add all event listeners
+    document.addEventListener('keydown', handleKeyDown, { capture: true })
+    document.addEventListener('copy', handleClipboard, { capture: true })
+    document.addEventListener('cut', handleClipboard, { capture: true })
+    document.addEventListener('paste', handleClipboard, { capture: true })
+    document.addEventListener('contextmenu', handleContextMenu, { capture: true })
+    document.addEventListener('selectstart', handleSelectStart, { capture: true })
+    document.addEventListener('dragstart', handleDragStart, { capture: true })
+    
+    // Layer 6: DevTools detection
+    let devtools = { open: false }
+    const threshold = 160
+    
+    const detectDevTools = () => {
+      if (window.outerHeight - window.innerHeight > threshold || 
+          window.outerWidth - window.innerWidth > threshold) {
+        if (!devtools.open) {
+          devtools.open = true
+          setCopyAttemptModal(true)
+        }
+      } else {
+        devtools.open = false
+      }
+    }
+    
+    const devToolsInterval = setInterval(detectDevTools, 500)
+    
+    // Layer 7: Console warning
+    console.clear()
+    console.log('%cSTOP!', 'color: red; font-size: 50px; font-weight: bold;')
+    console.log('%cThis is a browser feature intended for developers. Copy-pasting code defeats the purpose of learning. Code with your brain, not your clipboard! 🧠', 'color: red; font-size: 16px;')
     
     return () => {
-      document.removeEventListener('keydown', handleKeyDown)
-      document.removeEventListener('copy', handleCopy)
-      document.removeEventListener('cut', handleCopy)
-      document.removeEventListener('paste', handleCopy)
+      document.removeEventListener('keydown', handleKeyDown, { capture: true })
+      document.removeEventListener('copy', handleClipboard, { capture: true })
+      document.removeEventListener('cut', handleClipboard, { capture: true })
+      document.removeEventListener('paste', handleClipboard, { capture: true })
+      document.removeEventListener('contextmenu', handleContextMenu, { capture: true })
+      document.removeEventListener('selectstart', handleSelectStart, { capture: true })
+      document.removeEventListener('dragstart', handleDragStart, { capture: true })
+      clearInterval(devToolsInterval)
     }
   }, [])
   
@@ -293,7 +378,7 @@ const TopicProblems: React.FC = () => {
           editorRef.current.dispose()
         }
 
-        // Create new editor
+        // Enhanced Monaco Editor protection
         editorRef.current = monaco.editor.create(monacoEl.current!, {
           value: code || getLanguageTemplate(language),
           language: getMonacoLanguage(language),
@@ -311,7 +396,7 @@ const TopicProblems: React.FC = () => {
           autoClosingQuotes: 'always',
           autoSurround: 'languageDefined',
           bracketPairColorization: { enabled: true },
-          contextmenu: true,
+          contextmenu: false, // Disable right-click menu
         })
 
         // Update code state when editor content changes
@@ -325,25 +410,44 @@ const TopicProblems: React.FC = () => {
           }
         })
 
-        // Add keyboard shortcuts override and paste detection
+        // Enhanced keyboard shortcuts override
+        editorRef.current.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
+          handleRunCode()
+        })
+        editorRef.current.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.Enter, () => {
+          handleSubmitSolution()
+        })
         editorRef.current.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyC, () => {
           setCopyAttemptModal(true)
+          return null
         })
         editorRef.current.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyV, () => {
           setCopyAttemptModal(true)
+          return null
         })
         editorRef.current.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyX, () => {
           setCopyAttemptModal(true)
+          return null
         })
         editorRef.current.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyA, () => {
           setCopyAttemptModal(true)
+          return null
         })
         
-        // Override paste action
+        // Override all clipboard operations
         editorRef.current.onDidPaste(() => {
           setCopyAttemptModal(true)
-          // Undo the paste
           editorRef.current.trigger('keyboard', 'undo', null)
+        })
+        
+        // Block browser shortcuts
+        editorRef.current.addCommand(monaco.KeyCode.F12, () => {
+          setCopyAttemptModal(true)
+          return null
+        })
+        editorRef.current.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyI, () => {
+          setCopyAttemptModal(true)
+          return null
         })
 
         // Load saved code immediately after editor is created
@@ -394,7 +498,63 @@ const TopicProblems: React.FC = () => {
     setFailedTestCase(null)
   }, [currentProblemIndex])
 
-  const handleRunCode = async () => {
+  const executeCode = async (code, language, input, timeout = 10000) => {
+    const languageMap = {
+      cpp: 'cpp',
+      java: 'java',
+      python: 'python',
+      c: 'c'
+    }
+
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), timeout)
+
+    try {
+      const response = await fetch('https://emkc.org/api/v2/piston/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          language: languageMap[language as keyof typeof languageMap],
+          version: '*',
+          files: [{ content: code }],
+          stdin: input.replace('\\n', '\n')
+        }),
+        signal: controller.signal
+      })
+
+      clearTimeout(timeoutId)
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+
+      const result = await response.json()
+      
+      let userOutput = ''
+      
+      if (result.run) {
+        if (result.run.stdout) {
+          userOutput = result.run.stdout.trim()
+        }
+        if (result.run.stderr) {
+          userOutput = 'Error: ' + result.run.stderr
+        }
+        if (result.compile && result.compile.stderr) {
+          userOutput = 'Compile Error: ' + result.compile.stderr
+        }
+      }
+      
+      return userOutput || 'No output'
+      
+    } catch (error) {
+      clearTimeout(timeoutId)
+      if (error.name === 'AbortError') {
+        return 'Timeout: Code execution took too long'
+      }
+      return `Connection error: ${error.message}`
+    }
+  }
+  const handleRunCode = useCallback(async () => {
     if (!code.trim() || !language) return
     
     // Save current code to database
@@ -413,60 +573,23 @@ const TopicProblems: React.FC = () => {
     setSubmissionResult(null)
     setFailedTestCase(null)
     
-    const languageMap = {
-      cpp: 'cpp',
-      java: 'java',
-      python: 'python',
-      c: 'c'
-    }
-
-    const apis = [
-      'https://emkc.org/api/v2/piston/execute'
-    ]
-    
     try {
-      // Run test cases sequentially to avoid rate limiting
       const updatedTestCases = []
       
-      for (const testCase of currentProblem.testCases.public) {
+      for (let i = 0; i < currentProblem.testCases.public.length; i++) {
+        const testCase = currentProblem.testCases.public[i]
+        
         try {
-          const response = await fetch('https://emkc.org/api/v2/piston/execute', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              language: languageMap[language as keyof typeof languageMap],
-              version: '*',
-              files: [{ content: code }],
-              stdin: testCase.input.replace('\\n', '\n')
-            })
-          })
-          
-          const result = await response.json()
-          let userOutput = ''
-          
-          if (result.run) {
-            if (result.run.stdout) {
-              userOutput = result.run.stdout.trim()
-            }
-            if (result.run.stderr) {
-              userOutput = 'Error: ' + result.run.stderr
-            }
-            if (result.compile && result.compile.stderr) {
-              userOutput = 'Compile Error: ' + result.compile.stderr
-            }
-          }
-          
-          if (!userOutput) {
-            userOutput = 'No output'
-          }
-          
+          const userOutput = await executeCode(code, language, testCase.input)
           updatedTestCases.push({ ...testCase, userOutput })
           
-          // Small delay between requests to avoid rate limiting
-          await new Promise(resolve => setTimeout(resolve, 100))
+          // Small delay between requests
+          if (i < currentProblem.testCases.public.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 200))
+          }
           
         } catch (error) {
-          updatedTestCases.push({ ...testCase, userOutput: 'Connection error' })
+          updatedTestCases.push({ ...testCase, userOutput: 'Execution failed' })
         }
       }
       
@@ -491,9 +614,9 @@ const TopicProblems: React.FC = () => {
     } finally {
       setIsRunning(false)
     }
-  }
+  }, [code, language, currentProblem, problems, currentProblemIndex, headers])
 
-  const handleSubmitSolution = async () => {
+  const handleSubmitSolution = useCallback(async () => {
     if (!code.trim() || !language) return
 
     setIsSubmitting(true)
@@ -501,12 +624,6 @@ const TopicProblems: React.FC = () => {
     setSubmissionResult(null)
     
     const startTime = Date.now()
-    const languageMap = {
-      cpp: 'cpp',
-      java: 'java', 
-      python: 'python',
-      c: 'c'
-    }
     
     try {
       // Run all test cases (public + private)
@@ -514,46 +631,44 @@ const TopicProblems: React.FC = () => {
       let passedCount = 0
       
       for (const testCase of allTestCases) {
-        const response = await fetch('https://emkc.org/api/v2/piston/execute', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            language: languageMap[language as keyof typeof languageMap],
-            version: '*',
-            files: [{
-              content: code
-            }],
-            stdin: testCase.input.replace('\\n', '\n')
-          })
-        })
-        
-        const result = await response.json()
-        
-        let userOutput = ''
-        
-        if (result.run) {
-          if (result.run.stdout) {
-            userOutput = result.run.stdout.trim()
+        try {
+          const userOutput = await executeCode(code, language, testCase.input, 15000) // 15s timeout for submission
+          
+          // Check if test case failed
+          if (userOutput !== testCase.output) {
+            // Record failed submission
+            const timeTaken = Date.now() - startTime
+            await api.post('/user/submit', {
+              questionId: currentProblem._id,
+              code,
+              language,
+              status: 'failed',
+              runtime: timeTaken,
+              memory: Math.round(timeTaken / 200),
+              testCasesPassed: passedCount,
+              totalTestCases: allTestCases.length
+            }, { headers })
+            
+            // Refresh submissions if on submissions tab
+            if (problemTabValue === 1) {
+              fetchSubmissions()
+            }
+            
+            setFailedTestCase({
+              input: testCase.input,
+              output: testCase.output,
+              userOutput: userOutput,
+              passedCount: passedCount,
+              totalCount: allTestCases.length
+            })
+            setIsSubmitting(false)
+            return
           }
           
-          if (result.run.stderr) {
-            userOutput = 'Error: ' + result.run.stderr
-          }
+          passedCount++
           
-          if (result.compile && result.compile.stderr) {
-            userOutput = 'Compile Error: ' + result.compile.stderr
-          }
-        }
-        
-        if (!userOutput) {
-          userOutput = 'No output'
-        }
-        
-        // Check if test case failed
-        if (userOutput !== testCase.output) {
-          // Record failed submission
+        } catch (error) {
+          // Handle execution error as failed test case
           const timeTaken = Date.now() - startTime
           await api.post('/user/submit', {
             questionId: currentProblem._id,
@@ -566,23 +681,16 @@ const TopicProblems: React.FC = () => {
             totalTestCases: allTestCases.length
           }, { headers })
           
-          // Refresh submissions if on submissions tab
-          if (problemTabValue === 1) {
-            fetchSubmissions()
-          }
-          
           setFailedTestCase({
             input: testCase.input,
             output: testCase.output,
-            userOutput: userOutput,
+            userOutput: 'Execution error',
             passedCount: passedCount,
             totalCount: allTestCases.length
           })
           setIsSubmitting(false)
           return
         }
-        
-        passedCount++
       }
       
       // All test cases passed
@@ -625,7 +733,7 @@ const TopicProblems: React.FC = () => {
     } finally {
       setIsSubmitting(false)
     }
-  }
+  }, [code, language, currentProblem, problems, currentProblemIndex, headers, problemTabValue, fetchSubmissions, fetchUserCoins, setProblems, setQuestions])
 
   const canAccessProblem = (index: number): boolean => {
     if (index === 0) return true
@@ -740,8 +848,68 @@ const TopicProblems: React.FC = () => {
 
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
-        <Typography>Loading questions...</Typography>
+      <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+        {/* Sidebar skeleton */}
+        <Box sx={{ width: 320, borderRight: '1px solid', borderColor: 'divider', p: 3 }}>
+          <Box sx={{ mb: 3 }}>
+            <Skeleton variant="text" width={150} height={32} sx={{ mb: 2 }} />
+            <Skeleton variant="rectangular" width="100%" height={8} sx={{ borderRadius: 1, mb: 1 }} />
+            <Skeleton variant="text" width={100} height={20} />
+          </Box>
+          {[...Array(5)].map((_, index) => (
+            <Card key={index} sx={{ mb: 2, borderRadius: 2 }}>
+              <CardContent sx={{ p: 2.5 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                  <Skeleton variant="circular" width={20} height={20} />
+                  <Skeleton variant="text" width="70%" height={20} />
+                </Box>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Skeleton variant="rectangular" width={50} height={24} sx={{ borderRadius: 1 }} />
+                  <Skeleton variant="rectangular" width={60} height={24} sx={{ borderRadius: 1 }} />
+                </Box>
+              </CardContent>
+            </Card>
+          ))}
+        </Box>
+
+        {/* Main content skeleton */}
+        <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+          {/* Header skeleton */}
+          <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Skeleton variant="circular" width={40} height={40} />
+            <Skeleton variant="rectangular" width={100} height={36} sx={{ borderRadius: 1 }} />
+            <Box sx={{ flexGrow: 1 }} />
+            <Skeleton variant="rectangular" width={120} height={40} sx={{ borderRadius: 2 }} />
+            <Skeleton variant="rectangular" width={80} height={30} sx={{ borderRadius: 1 }} />
+            <Skeleton variant="rectangular" width={80} height={36} sx={{ borderRadius: 1 }} />
+            <Skeleton variant="rectangular" width={80} height={36} sx={{ borderRadius: 1 }} />
+          </Box>
+
+          <Box sx={{ display: 'flex', flexGrow: 1 }}>
+            {/* Problem statement skeleton */}
+            <Box sx={{ width: '50%', borderRight: '1px solid', borderColor: 'divider', p: 3 }}>
+              <Skeleton variant="text" width={200} height={40} sx={{ mb: 3 }} />
+              <Skeleton variant="text" width="100%" height={20} sx={{ mb: 1 }} />
+              <Skeleton variant="text" width="90%" height={20} sx={{ mb: 1 }} />
+              <Skeleton variant="text" width="95%" height={20} sx={{ mb: 3 }} />
+              <Skeleton variant="rectangular" width="100%" height={100} sx={{ borderRadius: 1, mb: 3 }} />
+              <Skeleton variant="text" width="100%" height={20} sx={{ mb: 1 }} />
+              <Skeleton variant="text" width="80%" height={20} />
+            </Box>
+
+            {/* Code editor skeleton */}
+            <Box sx={{ width: '50%', display: 'flex', flexDirection: 'column' }}>
+              <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Skeleton variant="rectangular" width={120} height={32} sx={{ borderRadius: 1 }} />
+                <Box sx={{ flexGrow: 1 }} />
+                <Skeleton variant="circular" width={32} height={32} />
+              </Box>
+              <Box sx={{ flexGrow: 1, p: 2 }}>
+                <Skeleton variant="rectangular" width="100%" height="100%" sx={{ borderRadius: 1 }} />
+              </Box>
+            </Box>
+          </Box>
+        </Box>
       </Box>
     )
   }
@@ -766,7 +934,21 @@ const TopicProblems: React.FC = () => {
   }
 
   return (
-    <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden', userSelect: 'none' }}>
+    <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden', userSelect: 'none', 
+      // Additional CSS protection
+      '& *': {
+        userSelect: 'none !important',
+        '-webkit-user-select': 'none !important',
+        '-moz-user-select': 'none !important',
+        '-ms-user-select': 'none !important'
+      },
+      '& .monaco-editor *': {
+        userSelect: 'text !important',
+        '-webkit-user-select': 'text !important',
+        '-moz-user-select': 'text !important',
+        '-ms-user-select': 'text !important'
+      }
+    }}>
       {/* Sidebar */}
       <Drawer
         variant="persistent"
@@ -890,6 +1072,18 @@ const TopicProblems: React.FC = () => {
       <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
         {/* Header */}
         <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 2 }}>
+          <IconButton
+            onClick={() => navigate('/practice')}
+            sx={{ 
+              p: 1.5,
+              borderRadius: 2,
+              color: 'text.primary',
+              '&:hover': { bgcolor: isDark ? 'grey.800' : 'grey.100' }
+            }}
+          >
+            <ArrowBack />
+          </IconButton>
+          
           {!sidebarOpen && (
             <Button
               variant="contained"
@@ -920,8 +1114,10 @@ const TopicProblems: React.FC = () => {
               backgroundColor: 'white', 
               borderRadius: 2, 
               px: 2, 
-              py: 1
+              py: 1,
+              cursor: 'pointer'
             }}
+            onClick={() => navigate('/practice')}
           >
             <img 
               src={logo} 
@@ -950,8 +1146,8 @@ const TopicProblems: React.FC = () => {
                 ODE
               </Typography>
             </Box>
-            <Box sx={{ display: 'none', alignItems: 'center', gap: 1, ml: 2 }}>
-              <MonetizationOn sx={{ color: 'warning.main', fontSize: '1.5rem' }} />
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 2 }}>
+              <Toll sx={{ color: 'warning.main', fontSize: '1.5rem' }} />
               <Typography variant="h6" sx={{ fontWeight: 600, color: 'warning.main' }}>
                 {userCoins} ORCS
               </Typography>
@@ -1461,7 +1657,7 @@ const TopicProblems: React.FC = () => {
                                 </TableCell>
                                 <TableCell>
                                   <Typography variant="body2" color="text.secondary">
-                                    {new Date(submission.submittedAt).toLocaleString()}
+                                    {new Date(submission.submittedAt).toLocaleDateString('en-GB')}
                                   </Typography>
                                 </TableCell>
                               </TableRow>
